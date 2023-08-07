@@ -1,0 +1,20 @@
+CompileFlags:
+  Compiler: emcc
+  Add: [
+    -DEMSCRIPTEN,
+    -DSOKOL_GLES3,
+    -target,
+    wasm32-unknown-emscripten,
+    --sysroot=/home/l-m/git/emsdk/upstream/emscripten/cache/sysroot,
+    -Xclang,
+    -iwithsysroot/include/compat,
+    -I/home/l-m/git/sdd-assesment/include,
+    -I/home/l-m/git/sdd-assesment/cimgui,
+    -I/home/l-m/git/sdd-assesment/sokol,
+    -Wno-unused-parameter,
+    -Wno-unused-function,
+    -Wall,
+    -Wextra,
+    -Wshadow,
+    -std=gnu11,
+  ]
