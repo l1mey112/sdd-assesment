@@ -70,7 +70,6 @@ int filter_to_az(ImGuiInputTextCallbackData* data) {
 void hangman(void) {
 	bool refresh = false;
 
-	static char charbuf[2]; // +1 for nul
 	static int word_idx = -1;
 	static const char *selected_word;
 	static unsigned selected_word_len = 0;
@@ -90,10 +89,22 @@ void hangman(void) {
 		missed_letters_count = 0;
 	}
 
+	ImGuiIO* io = igGetIO();
+
 	if (found_chars != selected_word_len) {
-		if (igInputTextEx("##word", "input text (w/ hint)", charbuf, IM_ARRAYSIZE(charbuf), V2ZERO, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCharFilter, filter_to_az, NULL) && charbuf[0] != 0) {
-			char ch = tolower(charbuf[0]);
+		unsigned short ch = 0;
+		if (io->InputQueueCharacters.Size > 0) {
+			ch = io->InputQueueCharacters.Data[0];
+			if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+				ch = tolower(ch);
+			} else {
+				ch = 0;
+			}
+		}
+		// if `ch` isn't nul && `ch` hasn't been found yet
+		if (ch != 0 && !strchr(selbuf, ch)) {
 			bool ever_found = false;
+
 			for (unsigned i = 0; i < selected_word_len; i++) {
 				if (selected_word[i] == ch) {
 					// found
@@ -105,6 +116,7 @@ void hangman(void) {
 			// append to missed letters if never found and never missed before
 			if (!ever_found && !strchr(missed_letters, ch)) {
 				missed_letters[missed_letters_count++] = ch;
+				igText("go!");
 			}
 		}
 		igText("missed: %s", missed_letters);
