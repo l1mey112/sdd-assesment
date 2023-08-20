@@ -150,271 +150,318 @@ float calculate_tax(float income) {
 }
 
 void tax_breaks(void) {
-	igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
-	igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
-	igBegin("Tax Breaks", 0, ImGuiWindowFlags_AlwaysAutoResize);
+    // Set initial window position and size
+    igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
+    igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
+    
+    // Begin ImGui window titled "Tax Breaks"
+    igBegin("Tax Breaks", 0, ImGuiWindowFlags_AlwaysAutoResize);
+    
+    // Buffer for employee name input, income input, and output
+    static char name_input_buf[128] = {};
+    static char income_input_buf[128] = {};
+    static char output_buf[1024] = {};
 
-	static char name_input_buf[128] = {};
-	static char income_input_buf[128] = {};
-	static char output_buf[1024] = {};
+    // Flag to determine whether to add a new entry
+    bool add_entry = false;
 
-	bool add_entry = false;
+    // Begin an ImGui table with 3 columns for entry input
+    if (igBeginTable("Entry", 3, 0, V2ZERO, 20.0f)) {
+        // Move to the next row in the table
+        igTableNextRow(0, 0);
+        
+        // First column: Employee Name input
+        igTableNextColumn();
+        {
+            igInputTextEx("Employee Name", "", name_input_buf, sizeof(name_input_buf), (ImVec2){100.f, 0.f}, 0, 0, 0);
+        }
+        
+        // Second column: Gross Income input
+        igTableNextColumn();
+        {
+            igInputTextEx("Gross Income", "", income_input_buf, sizeof(income_input_buf), (ImVec2){100.f, 0.f}, ImGuiInputTextFlags_CharsDecimal, 0, 0);
+        }
+        
+        // Third column: "Add Entry" button
+        igTableNextColumn();
+        {
+            add_entry = igButton("Add Entry", V2ZERO);
+        }
+        
+        // End the table
+        igEndTable();
+    }
 
-	if(igBeginTable("Entry", 3, 0, V2ZERO, 20.0f))
-	{
-		igTableNextRow(0, 0);
-		igTableNextColumn();
-		{
-			igInputTextEx("Employee Name", "", name_input_buf, sizeof(name_input_buf), (ImVec2){100.f, 0.f}, 0, 0, 0);
-		}
-		igTableNextColumn();
-		{
-			igInputTextEx("Gross Income", "", income_input_buf, sizeof(income_input_buf), (ImVec2){100.f, 0.f}, ImGuiInputTextFlags_CharsDecimal, 0, 0);
-		}
-		igTableNextColumn();
-		{
-			add_entry = igButton("Add Entry", V2ZERO);
-		}
-		igEndTable();
-	}
+    // Initialize arrays to hold entry information
+    static int entries_count = 0;
+    static const char *name_entries[20];
+    static double income_entries[20];
+    static double tax_entries[20];
 
-	static int entries_count = 0;
-	static const char *name_entries[20];
-	static double income_entries[20];
-	static double tax_entries[20];
+    // If "Add Entry" button is pressed and there is space for new entries
+    if (add_entry && entries_count < 20) {		
+        // Convert income input to double
+        char *tail_err;
+        double income = strtod(income_input_buf, &tail_err);
 
-	if (add_entry && entries_count < 20) {		
-		char *tail_err;
-		double income = strtod(income_input_buf, &tail_err);
+        // If name or income is provided, add an entry
+        if (name_input_buf[0] != '\0' || income_input_buf[0] != '\0') {
+            name_entries[entries_count] = strdup(name_input_buf);
+            income_entries[entries_count] = income;
+            tax_entries[entries_count] = calculate_tax(income);
 
-		if (name_input_buf[0] != '\0' || income_input_buf[0] != '\0') {
-			name_entries[entries_count] = strdup(name_input_buf);
-			income_entries[entries_count] = income;
-			tax_entries[entries_count] = calculate_tax(income);
+            entries_count++;
+        }
 
-			entries_count++;
-		}
+        // Clear input buffers
+        memset(name_input_buf, 0, sizeof(name_input_buf));
+        memset(income_input_buf, 0, sizeof(income_input_buf));
+    }
 
-		memset(name_input_buf, 0, sizeof(name_input_buf));
-		memset(income_input_buf, 0, sizeof(income_input_buf));
-	}
+    // Create a separator for visual clarity
+    igSeparator();
 
-	igSeparator();
+    // Button to display tax information
+    if (igButton("Display Tax", V2ZERO)) {
+        int output_p = 0;
 
-	if (igButton("Display Tax", V2ZERO)) {
-		int p = 0;
-		
-		for (int i = 0; i < entries_count; i++) {
-			p += snprintf(output_buf + p, sizeof(output_buf) - p, "%s - Income: %g, Taxation: $%g\n", name_entries[i], income_entries[i], tax_entries[i]);
-		}
-		
-		for (int i = 0; i < entries_count; i++) {
-			free((void*)name_entries[i]); // free memory
-		}
-		entries_count = 0;
-	}
-	igSameLine(0, igGetStyle()->CellPadding.x);
-	igText("Entries: %d", entries_count);
+        // Generate output for each entry and calculate total tax
+        for (int i = 0; i < entries_count; i++) {
+            output_p += snprintf(output_buf + output_p, sizeof(output_buf) - output_p, "%s - Income: %g, Taxation: $%g\n", name_entries[i], income_entries[i], tax_entries[i]);
+        }
 
-	igSeparator();
+        // Free allocated memory for name entries and reset entries count
+        for (int i = 0; i < entries_count; i++) {
+            free((void*)name_entries[i]);
+        }
+        entries_count = 0;
+    }
 
-	ImVec2 avail;
-	igGetContentRegionAvail(&avail);
+    // Display the count of entries
+    igSameLine(0, igGetStyle()->CellPadding.x);
+    igText("Entries: %d", entries_count);
 
-	igInputTextMultiline("##output_box", output_buf, sizeof(output_buf), (ImVec2){avail.x, 200.f}, 0, 0, 0);
+    // Create another separator
+    igSeparator();
 
-	igEnd();
+    // Get available region for output display
+    ImVec2 avail;
+    igGetContentRegionAvail(&avail);
+
+    // Multiline text input for displaying output
+    igInputTextMultiline("##output_box", output_buf, sizeof(output_buf), (ImVec2){avail.x, 200.f}, 0, 0, 0);
+
+    // End the ImGui window
+    igEnd();
 }
 
 void hangman(void) {
-	enum hangman_colour_state {
-		ST_FINE,
-		ST_FAILED,
-		ST_SUCCESS,
-	};
+    // Define enumeration to represent different hangman colour states
+    enum hangman_colour_state {
+        ST_FINE,
+        ST_FAILED,
+        ST_SUCCESS,
+    };
 
-	static enum hangman_colour_state state = ST_FINE;
+    // Static variable to store the current hangman colour state
+    static enum hangman_colour_state state = ST_FINE;
 
-	switch (state) {
-	case ST_FINE: break;
-	case ST_FAILED:
-		igPushStyleColor_U32(ImGuiCol_WindowBg, IM_COL32(255, 0, 0, 255));
-		break;
-	case ST_SUCCESS:
-		igPushStyleColor_U32(ImGuiCol_WindowBg, IM_COL32(0, 255, 0, 255));
-		break;
-	}
+    // Set window background colour based on the current state
+    switch (state) {
+        case ST_FINE: break;
+        case ST_FAILED:
+            igPushStyleColor_U32(ImGuiCol_WindowBg, IM_COL32(255, 0, 0, 255));
+            break;
+        case ST_SUCCESS:
+            igPushStyleColor_U32(ImGuiCol_WindowBg, IM_COL32(0, 255, 0, 255));
+            break;
+    }
 
-	igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
-	igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
-	igBegin("Hangman", 0, ImGuiWindowFlags_AlwaysAutoResize);
+    // Set initial window position and size
+    igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
+    igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
+    
+    // Begin ImGui window titled "Hangman"
+    igBegin("Hangman", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
-	if (state != ST_FINE) {
-		igPopStyleColor(1);
-		state = ST_FINE;
-	}
+    // Reset window background if not in ST_FINE state
+    if (state != ST_FINE) {
+        igPopStyleColor(1);
+        state = ST_FINE;
+    }
 
-	char buf[128];
-	ImVec2 avail;
-	igGetContentRegionAvail(&avail);
-	
-	const char* explanation1 =
-		"+ Textboxes for Incomplete Word and Missed Letters:\n\n"
-		"These textboxes provide real-time game information. The 'Incomplete Word' aids \n"
-		"the player's progress, while 'Missed Letters' prevents repeated guesses, \n"
-		"enhancing engagement. In this Hangman program, they foster strategy and \n"
-		"informed guessing, making the game more interactive.";
-		
-	const char* explanation2 =
-		"+ Restart Button:\n\n"
-		"The 'Restart?' button ensures seamless user experience by enabling game \n"
-		"restarts without program relaunch. Enhancing usability, it aligns with user \n"
-		"expectations and optimises efficiency. Its inclusion reflects general interface \n"
-		"design principles and enhances user-friendliness in the program.";
+    // Temporary buffer for formatting text
+    char buf[128];
 
-	static bool interface_info_selected = false;	
-	igSelectable_BoolPtr("Click For Interface Information", &interface_info_selected, 0, V2ZERO);
-	if ((interface_info_selected = igBeginPopupContextItem("", 0))) {
-		igText(explanation1);
-		igSeparator();
-		igText(explanation2);
-		igEndPopup();
-	}
+    // Get available content region
+    ImVec2 avail;
+    igGetContentRegionAvail(&avail);
 
-	igSeparator();
+    // Explanatory text for the interface
+    const char* explanation1 = "+ Textboxes for Incomplete Word and Missed Letters:\n\n"
+                              "These textboxes provide real-time game information. The 'Incomplete Word' aids \n"
+                              "the player's progress, while 'Missed Letters' prevents repeated guesses, \n"
+                              "enhancing engagement. In this Hangman program, they foster strategy and \n"
+                              "informed guessing, making the game more interactive.";
+    const char* explanation2 = "+ Restart Button:\n\n"
+                              "The 'Restart?' button ensures seamless user experience by enabling game \n"
+                              "restarts without program relaunch. Enhancing usability, it aligns with user \n"
+                              "expectations and optimises efficiency. Its inclusion reflects general interface \n"
+                              "design principles and enhances user-friendliness in the program.";
 
-	bool refresh = false;
-	bool failed = false;
-	bool found = false;
+    // Flag to track if interface info is selected
+    static bool interface_info_selected = false;
+    igSelectable_BoolPtr("Click For Interface Information", &interface_info_selected, 0, V2ZERO);
 
-	static int word_idx = -1;
-	static const char *selected_word;
-	static unsigned selected_word_len = 0;
-	static char selbuf[64];
-	static unsigned found_chars;
-	static char missed_letters[64];
-	static unsigned missed_letters_count = 0;
+    // Display interface information as a popup if selected
+    if ((interface_info_selected = igBeginPopupContextItem("", 0))) {
+        igText(explanation1);
+        igSeparator();
+        igText(explanation2);
+        igEndPopup();
+    }
 
-	if (word_idx == -1) {
-		// select random
-		word_idx = random_of(IM_ARRAYSIZE(hangman_words));
+    // Create a separator for visual clarity
+    igSeparator();
 
-		// initialise variables
-		selected_word = hangman_words[word_idx];
-		selected_word_len = strlen(selected_word);
-		memset(selbuf, '_', selected_word_len);
-		selbuf[selected_word_len] = 0;
-		found_chars = 0;
-		memset(missed_letters, 0, IM_ARRAYSIZE(missed_letters));
-		missed_letters_count = 0;
-	}
+    // Flags to track game state
+    bool refresh = false;
+    bool failed = false;
+    bool found = false;
 
-	int hangman_state = missed_letters_count;
-	if (missed_letters_count >= IM_ARRAYSIZE(hangman_states)) {
-		hangman_state = IM_ARRAYSIZE(hangman_states) - 1;
-	}
+    // Static variables to manage game data and state
+    static int word_idx = -1;
+    static const char *selected_word;
+    static unsigned selected_word_len = 0;
+    static char selbuf[64];
+    static unsigned found_chars;
+    static char missed_letters[64];
+    static unsigned missed_letters_count = 0;
 
-	ImGuiIO *io = igGetIO();
+    // Initialize game data if word index is -1
+    if (word_idx == -1) {
+        word_idx = random_of(IM_ARRAYSIZE(hangman_words));
+        selected_word = hangman_words[word_idx];
+        selected_word_len = strlen(selected_word);
+        memset(selbuf, '_', selected_word_len);
+        selbuf[selected_word_len] = 0;
+        found_chars = 0;
+        memset(missed_letters, 0, IM_ARRAYSIZE(missed_letters));
+        missed_letters_count = 0;
+    }
 
-	failed = found_chars != selected_word_len && missed_letters_count >= IM_ARRAYSIZE(hangman_states) - 1;
-	found = found_chars == selected_word_len;
+    // Determine hangman state based on missed letters count
+    int hangman_state = missed_letters_count;
+    if (missed_letters_count >= IM_ARRAYSIZE(hangman_states)) {
+        hangman_state = IM_ARRAYSIZE(hangman_states) - 1;
+    }
 
-	if (!failed && !found) {
-		unsigned short ch = 0;
-		// if there is characters, and the window is focused
-		if (igIsWindowFocused(0) && io->InputQueueCharacters.Size > 0) {
-			ch = io->InputQueueCharacters.Data[0];
-			if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
-				ch = tolower(ch);
-			} else {
-				ch = 0;
-			}
-		}
-		// if `ch` isn't nul && `ch` hasn't been found yet
-		if (ch != 0 && !strchr(selbuf, ch)) {
-			bool ever_found = false;
+    // Get ImGui IO for input handling
+    ImGuiIO *io = igGetIO();
 
-			for (unsigned i = 0; i < selected_word_len; i++) {
-				if (selected_word[i] == ch) {
-					// found
-					selbuf[i] = ch;
-					found_chars++;
-					ever_found = true;
-					state = ST_SUCCESS;
-				}
-			}
-			// append to missed letters if never found and never missed before
-			if (!ever_found && !strchr(missed_letters, ch)) {
-				state = ST_FAILED;
-				missed_letters[missed_letters_count++] = ch;
-			}
-		}
-	}
+    // Update failed and found states
+    failed = found_chars != selected_word_len && missed_letters_count >= IM_ARRAYSIZE(hangman_states) - 1;
+    found = found_chars == selected_word_len;
 
-	ImVec2 img_size = {(float)hangman_states[hangman_state].w * 1.5f, (float)hangman_states[hangman_state].h * 1.5f};
-	
-	{
-		igSetCursorPosX(igGetCursorPosX() + (avail.x - img_size.x) * 0.5f);
-		igImage(hangman_states[hangman_state].tid, img_size, (ImVec2){0.f, 0.f}, (ImVec2){1.f, 1.f}, (ImVec4){1.0f, 1.0f, 1.0f, 1.0f}, (ImVec4){});
-	}
+    // Handle user input for the game
+    if (!failed && !found) {
+        unsigned short ch = 0;
+        if (igIsWindowFocused(0) && io->InputQueueCharacters.Size > 0) {
+            ch = io->InputQueueCharacters.Data[0];
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                ch = tolower(ch);
+            } else {
+                ch = 0;
+            }
+        }
+        if (ch != 0 && !strchr(selbuf, ch)) {
+            bool ever_found = false;
 
-	igSeparator();
-	{
-		ImVec2 box_size;
-		
-		snprintf(buf, sizeof(buf), "word: %s", selbuf);
-		box_size = nice_box_size(buf);
-		igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
-		nice_box(buf, IM_COL32(36, 36, 36, 255));
+            for (unsigned i = 0; i < selected_word_len; i++) {
+                if (selected_word[i] == ch) {
+                    selbuf[i] = ch;
+                    found_chars++;
+                    ever_found = true;
+                    state = ST_SUCCESS;
+                }
+            }
+            if (!ever_found && !strchr(missed_letters, ch)) {
+                state = ST_FAILED;
+                missed_letters[missed_letters_count++] = ch;
+            }
+        }
+    }
 
-		snprintf(buf, sizeof(buf), "hint: %s", hangman_hints[word_idx]);
-		box_size = nice_box_size(buf);
-		igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
-		nice_box(buf, IM_COL32(36, 36, 36, 255));
-	}
-	igSeparator();
+    // Determine image size based on hangman state
+    ImVec2 img_size = {(float)hangman_states[hangman_state].w * 1.5f, (float)hangman_states[hangman_state].h * 1.5f};
+    
+    // Center-align image within the available region
+    igSetCursorPosX(igGetCursorPosX() + (avail.x - img_size.x) * 0.5f);
+    // Display hangman image
+    igImage(hangman_states[hangman_state].tid, img_size, (ImVec2){0.f, 0.f}, (ImVec2){1.f, 1.f}, (ImVec4){1.0f, 1.0f, 1.0f, 1.0f}, (ImVec4){});
 
-	const char *button_text = "Restart?";
+    // Create a separator for visual clarity
+    igSeparator();
+    {
+        ImVec2 box_size;
 
-	if (!(failed || found))
-	{
-		if (failed) {
-			strncpy(buf, "failed!", sizeof(buf));
-		} else if (found) {
-			strncpy(buf, "found!", sizeof(buf));
-		} else {
-			snprintf(buf, sizeof(buf), "missed: %s", missed_letters);
-		}
+        // Format and display the incomplete word
+        snprintf(buf, sizeof(buf), "word: %s", selbuf);
+        box_size = nice_box_size(buf);
+        igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
+        nice_box(buf, IM_COL32(36, 36, 36, 255));
 
-		float cpy = igGetCursorPosY();
-		{
-			nice_box(buf, IM_COL32(36, 36, 36, 255));		
-		}
-		{
-			
-			ImVec2 text_size;
-			igCalcTextSize(&text_size, button_text, NULL, true, -1.0f);
-			
-			float button_width = text_size.x + igGetStyle()->FramePadding.x * 2.f;
+        // Format and display the hint for the selected word
+        snprintf(buf, sizeof(buf), "hint: %s", hangman_hints[word_idx]);
+        box_size = nice_box_size(buf);
+        igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
+        nice_box(buf, IM_COL32(36, 36, 36, 255));
+    }
+    // Create a separator for visual clarity
+    igSeparator();
 
-			igSetCursorPosY(cpy);
-			igSetCursorPosX(igGetCursorPosX() + avail.x - button_width);
+    // Button text for restart or game status
+    const char *button_text = "Restart?";
 
-			if (igButton(button_text, V2ZERO)) {
-				refresh = true;
-			}
-		}
-	} else {
-		if (igButton(button_text, (ImVec2){avail.x, 0.f})) {
-			refresh = true;
-		}
-	}
+    // Display restart button or game status based on conditions
+    if (!(failed || found)) {
+        if (failed) {
+            strncpy(buf, "failed!", sizeof(buf));
+        } else if (found) {
+            strncpy(buf, "found!", sizeof(buf));
+        } else {
+            snprintf(buf, sizeof(buf), "missed: %s", missed_letters);
+        }
 
-	if (refresh) {
-		word_idx = -1;
-	}
+        // Display game status message in a nice box
+        float cpy = igGetCursorPosY();
+        nice_box(buf, IM_COL32(36, 36, 36, 255));
 
-	igEnd();
+        // Calculate button width and display the restart button
+        ImVec2 text_size;
+        igCalcTextSize(&text_size, button_text, NULL, true, -1.0f);
+        float button_width = text_size.x + igGetStyle()->FramePadding.x * 2.f;
+        igSetCursorPosY(cpy);
+        igSetCursorPosX(igGetCursorPosX() + avail.x - button_width);
+
+        // Trigger game restart on button press
+        if (igButton(button_text, V2ZERO)) {
+            refresh = true;
+        }
+    } else {
+        // Display the restart button when game is over
+        if (igButton(button_text, (ImVec2){avail.x, 0.f})) {
+            refresh = true;
+        }
+    }
+
+    // Refresh the game state if restart button is pressed
+    if (refresh) {
+        word_idx = -1;
+    }
+
+    // End the ImGui window
+    igEnd();
 }
 
 void frame(void) {
