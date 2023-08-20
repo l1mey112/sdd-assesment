@@ -205,7 +205,7 @@ static ImDrawList *__dl;
 static ImGuiIO *__io;
 
 #ifdef USE_INIT2
-static void init2(void);
+static __attribute__((unused)) void init2(void);
 #endif // USE_INIT2
 
 static struct
@@ -400,6 +400,18 @@ static void arrow(ImVec2 start, ImVec2 end, ImU32 color, float thickness, float 
 				 end.y - norm_dir.y * sz - norm_dir.x * sz * 0.6};
 
 	ImDrawList_AddTriangleFilled(__dl, end, p1, p2, color);
+}
+
+ImVec2 nice_box_size(const char *label)
+{
+	ImGuiStyle *style = &GImGui->Style;
+	ImVec2 label_size;
+
+	igCalcTextSize(&label_size, label, NULL, true, -1.0f);
+
+	ImVec2 size = {label_size.x + style->FramePadding.x * 2.0f, label_size.y + style->FramePadding.y * 2.0f};
+
+	return size;
 }
 
 void nice_box(const char *label, ImU32 col)

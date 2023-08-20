@@ -31,10 +31,10 @@ public/:
 public/index.html: $(DEMOS_SRC) build/libsokol.a build/libcimgui.a src/demos.h
 	emcc -o $@ $(DEMOS_SRC) $(CFLAGS) $(FCFLAGS) \
 		--shell-file sokol/shell.html \
-		-sNO_FILESYSTEM=1 \
 		-sASSERTIONS=0 \
 		-sMALLOC=emmalloc \
 		-Isokol -Icimgui -Iinclude \
+		--use-preload-plugins --preload-file ./assets@/ \
 		build/libsokol.a build/libcimgui.a
 ifeq ($(PROD),1)
 	wasm-opt $(patsubst %.html, %.wasm, $@) -o $(patsubst %.html, %.wasm, $@) \

@@ -19,6 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#define USE_INIT2
 #include "demos.h"
 #include <ctype.h>
 #include <string.h>
@@ -63,8 +64,8 @@ const char *hangman_hints[] = {
 	"A markup language for structuring and presenting content.",
 	"To produce or provide a yield.",
 	"A file compression format.",
-	"Low-level programming language.",
 	"Base-2 numeral system.",
+	"Low-level programming language.",
 	"High-speed data storage.",
 	"Structured collection of data.",
 	"A means of connecting devices to a network.",
@@ -89,74 +90,150 @@ const char *hangman_hints[] = {
 	"A bitwise operation.",
 };
 
-const char* hangman_states[] = {
-    "  +---+\n"
-    "  |   |\n"
-    "      |\n"
-    "      |\n"
-    "      |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    "      |\n"
-    "      |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    "  |   |\n"
-    "      |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    " /|   |\n"
-    "      |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    " /|\\  |\n"
-    "      |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    " /|\\  |\n"
-    " /    |\n"
-    "      |\n"
-    "=========\n",
-
-    "  +---+\n"
-    "  |   |\n"
-    "  O   |\n"
-    " /|\\  |\n"
-    " / \\  |\n"
-    "      |\n"
-    "=========\n"
-};
-
 EM_JS(int, random_of, (int of), {return Math.random() * (of - 1) | 0})
 
+struct {
+	const char *path;
+	ImTextureID tid;
+	int w, h;
+} hangman_states[] = {
+	{.path = "hm-0.png"},
+	{.path = "hm-1.png"},
+	{.path = "hm-2.png"},
+	{.path = "hm-3.png"},
+	{.path = "hm-4.png"},
+	{.path = "hm-5.png"},
+	{.path = "hm-6.png"},
+	{.path = "hm-7.png"},
+};
+
+void init2(void) {
+	for (int i = 0; i < IM_ARRAYSIZE(hangman_states); i++) {
+		int w, h;
+		
+		char *data = emscripten_get_preloaded_image_data(hangman_states[i].path, &w, &h);
+
+		printf("image(\"%s\", %d, %d): %p\n", hangman_states[i].path, w, h, data);
+
+		sg_image sg_img = sg_make_image(&(sg_image_desc){
+			.width = w,
+			.height = h,
+			.pixel_format = SG_PIXELFORMAT_RGBA8,
+			.wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+			.wrap_v = SG_WRAP_CLAMP_TO_EDGE,
+			.min_filter = SG_FILTER_LINEAR, 
+			.mag_filter = SG_FILTER_LINEAR, 
+			.data.subimage[0][0] = {
+				.ptr = data,
+				.size = (size_t)w * h * 4,
+			}
+		});
+
+		hangman_states[i].tid = (ImTextureID)(uintptr_t)sg_img.id;
+		hangman_states[i].w = w;
+		hangman_states[i].h = h;
+	}
+}
+
+float calculate_tax(float income) {
+    if (income <= 18200) {
+        return 0;
+    } else if (income <= 45000) {
+        return (income - 18200) * 0.19;
+    } else if (income <= 120000) {
+        return 5092 + (income - 45000) * 0.325;
+    } else if (income <= 180000) {
+        return 29467 + (income - 120000) * 0.37;
+    } else {
+        return 51667 + (income - 180000) * 0.45;
+    }
+}
+
+void tax_breaks(void) {
+	igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
+	igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
+	igBegin("Tax Breaks", 0, ImGuiWindowFlags_AlwaysAutoResize);
+
+	static char name_input_buf[128] = {};
+	static char income_input_buf[128] = {};
+	static char output_buf[1024] = {};
+
+	bool add_entry = false;
+
+	if(igBeginTable("Entry", 3, 0, V2ZERO, 20.0f))
+	{
+		igTableNextRow(0, 0);
+		igTableNextColumn();
+		{
+			igInputTextEx("Employee Name", "", name_input_buf, sizeof(name_input_buf), (ImVec2){100.f, 0.f}, 0, 0, 0);
+		}
+		igTableNextColumn();
+		{
+			igInputTextEx("Gross Income", "", income_input_buf, sizeof(income_input_buf), (ImVec2){100.f, 0.f}, ImGuiInputTextFlags_CharsDecimal, 0, 0);
+		}
+		igTableNextColumn();
+		{
+			add_entry = igButton("Add Entry", V2ZERO);
+		}
+		igEndTable();
+	}
+
+	static int entries_count = 0;
+	static const char *name_entries[20];
+	static double income_entries[20];
+	static double tax_entries[20];
+
+	if (add_entry && entries_count < 20) {		
+		char *tail_err;
+		double income = strtod(income_input_buf, &tail_err);
+
+		if (name_input_buf[0] != '\0' || income_input_buf[0] != '\0') {
+			name_entries[entries_count] = strdup(name_input_buf);
+			income_entries[entries_count] = income;
+			tax_entries[entries_count] = calculate_tax(income);
+
+			entries_count++;
+		}
+
+		memset(name_input_buf, 0, sizeof(name_input_buf));
+		memset(income_input_buf, 0, sizeof(income_input_buf));
+	}
+
+	igSeparator();
+
+	if (igButton("Display Tax", V2ZERO)) {
+		int p = 0;
+		
+		for (int i = 0; i < entries_count; i++) {
+			p += snprintf(output_buf + p, sizeof(output_buf) - p, "%s - Income: %g, Taxation: $%g\n", name_entries[i], income_entries[i], tax_entries[i]);
+		}
+		
+		for (int i = 0; i < entries_count; i++) {
+			free((void*)name_entries[i]); // free memory
+		}
+		entries_count = 0;
+	}
+	igSameLine(0, igGetStyle()->CellPadding.x);
+	igText("Entries: %d", entries_count);
+
+	igSeparator();
+
+	ImVec2 avail;
+	igGetContentRegionAvail(&avail);
+
+	igInputTextMultiline("##output_box", output_buf, sizeof(output_buf), (ImVec2){avail.x, 200.f}, 0, 0, 0);
+
+	igEnd();
+}
+
 void hangman(void) {
-	enum hangman_state {
+	enum hangman_colour_state {
 		ST_FINE,
 		ST_FAILED,
 		ST_SUCCESS,
 	};
 
-	static enum hangman_state state = ST_FINE;
+	static enum hangman_colour_state state = ST_FINE;
 
 	switch (state) {
 	case ST_FINE: break;
@@ -169,13 +246,42 @@ void hangman(void) {
 	}
 
 	igSetNextWindowPos((ImVec2){10, 10}, ImGuiCond_Once, (ImVec2){0, 0});
-	igSetNextWindowSize((ImVec2){400.f, 400.f}, ImGuiCond_Once);
-	igBegin("Hangman", 0, ImGuiWindowFlags_NoResize);
+	igSetNextWindowSize((ImVec2){380.f, 400.f}, ImGuiCond_Once);
+	igBegin("Hangman", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
 	if (state != ST_FINE) {
 		igPopStyleColor(1);
 		state = ST_FINE;
 	}
+
+	char buf[128];
+	ImVec2 avail;
+	igGetContentRegionAvail(&avail);
+	
+	const char* explanation1 =
+		"+ Textboxes for Incomplete Word and Missed Letters:\n\n"
+		"These textboxes provide real-time game information. The 'Incomplete Word' aids \n"
+		"the player's progress, while 'Missed Letters' prevents repeated guesses, \n"
+		"enhancing engagement. In this Hangman program, they foster strategy and \n"
+		"informed guessing, making the game more interactive.";
+		
+	const char* explanation2 =
+		"+ Restart Button:\n\n"
+		"The 'Restart?' button ensures seamless user experience by enabling game \n"
+		"restarts without program relaunch. Enhancing usability, it aligns with user \n"
+		"expectations and optimises efficiency. Its inclusion reflects general interface \n"
+		"design principles and enhances user-friendliness in the program.";
+
+	static bool interface_info_selected = false;	
+	igSelectable_BoolPtr("Click For Interface Information", &interface_info_selected, 0, V2ZERO);
+	if ((interface_info_selected = igBeginPopupContextItem("", 0))) {
+		igText(explanation1);
+		igSeparator();
+		igText(explanation2);
+		igEndPopup();
+	}
+
+	igSeparator();
 
 	bool refresh = false;
 	bool failed = false;
@@ -203,6 +309,11 @@ void hangman(void) {
 		missed_letters_count = 0;
 	}
 
+	int hangman_state = missed_letters_count;
+	if (missed_letters_count >= IM_ARRAYSIZE(hangman_states)) {
+		hangman_state = IM_ARRAYSIZE(hangman_states) - 1;
+	}
+
 	ImGuiIO *io = igGetIO();
 
 	failed = found_chars != selected_word_len && missed_letters_count >= IM_ARRAYSIZE(hangman_states) - 1;
@@ -211,7 +322,7 @@ void hangman(void) {
 	if (!failed && !found) {
 		unsigned short ch = 0;
 		// if there is characters, and the window is focused
-		if (io->WantCaptureMouse && io->InputQueueCharacters.Size > 0) {
+		if (igIsWindowFocused(0) && io->InputQueueCharacters.Size > 0) {
 			ch = io->InputQueueCharacters.Data[0];
 			if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
 				ch = tolower(ch);
@@ -238,28 +349,66 @@ void hangman(void) {
 				missed_letters[missed_letters_count++] = ch;
 			}
 		}
-		igText("missed: %s", missed_letters);
 	}
 
-	int hangman_state = missed_letters_count;
-	if (missed_letters_count >= IM_ARRAYSIZE(hangman_states)) {
-		hangman_state = IM_ARRAYSIZE(hangman_states) - 1;
-	}
-
-	igText(hangman_states[hangman_state]);
+	ImVec2 img_size = {(float)hangman_states[hangman_state].w * 1.5f, (float)hangman_states[hangman_state].h * 1.5f};
 	
-	if (failed) {
-		igText("failed!");
-	} else if (found) {
-		igText("found!");
+	{
+		igSetCursorPosX(igGetCursorPosX() + (avail.x - img_size.x) * 0.5f);
+		igImage(hangman_states[hangman_state].tid, img_size, (ImVec2){0.f, 0.f}, (ImVec2){1.f, 1.f}, (ImVec4){1.0f, 1.0f, 1.0f, 1.0f}, (ImVec4){});
 	}
 
-	if (igButton("refresh everything", V2ZERO)) {
-		refresh = true;
-	}
+	igSeparator();
+	{
+		ImVec2 box_size;
+		
+		snprintf(buf, sizeof(buf), "word: %s", selbuf);
+		box_size = nice_box_size(buf);
+		igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
+		nice_box(buf, IM_COL32(36, 36, 36, 255));
 
-	igTextWrapped("hint: %s", hangman_hints[word_idx]);
-	igTextWrapped("%s", selbuf);
+		snprintf(buf, sizeof(buf), "hint: %s", hangman_hints[word_idx]);
+		box_size = nice_box_size(buf);
+		igSetCursorPosX(igGetCursorPosX() + (avail.x - box_size.x) * 0.5f);
+		nice_box(buf, IM_COL32(36, 36, 36, 255));
+	}
+	igSeparator();
+
+	const char *button_text = "Restart?";
+
+	if (!(failed || found))
+	{
+		if (failed) {
+			strncpy(buf, "failed!", sizeof(buf));
+		} else if (found) {
+			strncpy(buf, "found!", sizeof(buf));
+		} else {
+			snprintf(buf, sizeof(buf), "missed: %s", missed_letters);
+		}
+
+		float cpy = igGetCursorPosY();
+		{
+			nice_box(buf, IM_COL32(36, 36, 36, 255));		
+		}
+		{
+			
+			ImVec2 text_size;
+			igCalcTextSize(&text_size, button_text, NULL, true, -1.0f);
+			
+			float button_width = text_size.x + igGetStyle()->FramePadding.x * 2.f;
+
+			igSetCursorPosY(cpy);
+			igSetCursorPosX(igGetCursorPosX() + avail.x - button_width);
+
+			if (igButton(button_text, V2ZERO)) {
+				refresh = true;
+			}
+		}
+	} else {
+		if (igButton(button_text, (ImVec2){avail.x, 0.f})) {
+			refresh = true;
+		}
+	}
 
 	if (refresh) {
 		word_idx = -1;
@@ -272,6 +421,7 @@ void frame(void) {
 	FRAME_PASS_BEGIN;
 
 	hangman();
+	tax_breaks();
 
 	BLIT_BG(IM_COL32(50, 50, 50, 255));
 
