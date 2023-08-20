@@ -89,6 +89,64 @@ const char *hangman_hints[] = {
 	"A bitwise operation.",
 };
 
+const char* hangman_states[] = {
+    "  +---+\n"
+    "  |   |\n"
+    "      |\n"
+    "      |\n"
+    "      |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    "      |\n"
+    "      |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    "  |   |\n"
+    "      |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    " /|   |\n"
+    "      |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    " /|\\  |\n"
+    "      |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    " /|\\  |\n"
+    " /    |\n"
+    "      |\n"
+    "=========\n",
+
+    "  +---+\n"
+    "  |   |\n"
+    "  O   |\n"
+    " /|\\  |\n"
+    " / \\  |\n"
+    "      |\n"
+    "=========\n"
+};
+
 EM_JS(int, random_of, (int of), {return Math.random() * (of - 1) | 0})
 
 void hangman(void) {
@@ -120,6 +178,8 @@ void hangman(void) {
 	}
 
 	bool refresh = false;
+	bool failed = false;
+	bool found = false;
 
 	static int word_idx = -1;
 	static const char *selected_word;
@@ -145,7 +205,10 @@ void hangman(void) {
 
 	ImGuiIO *io = igGetIO();
 
-	if (found_chars != selected_word_len) {
+	failed = found_chars != selected_word_len && missed_letters_count >= IM_ARRAYSIZE(hangman_states) - 1;
+	found = found_chars == selected_word_len;
+
+	if (!failed && !found) {
 		unsigned short ch = 0;
 		// if there is characters, and the window is focused
 		if (io->WantCaptureMouse && io->InputQueueCharacters.Size > 0) {
@@ -176,9 +239,21 @@ void hangman(void) {
 			}
 		}
 		igText("missed: %s", missed_letters);
-	} else {
+	}
+
+	int hangman_state = missed_letters_count;
+	if (missed_letters_count >= IM_ARRAYSIZE(hangman_states)) {
+		hangman_state = IM_ARRAYSIZE(hangman_states) - 1;
+	}
+
+	igText(hangman_states[hangman_state]);
+	
+	if (failed) {
+		igText("failed!");
+	} else if (found) {
 		igText("found!");
 	}
+
 	if (igButton("refresh everything", V2ZERO)) {
 		refresh = true;
 	}
