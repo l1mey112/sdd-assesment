@@ -472,7 +472,5 @@ void frame(void) {
 
 	BLIT_BG(IM_COL32(50, 50, 50, 255));
 
-	igShowDemoWindow(false);
-
 	FRAME_PASS_END;
 }
